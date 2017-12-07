@@ -112,7 +112,7 @@ my $GNUPLOT_OUTPUT_FILE = "output-$label_files-$YYYY_MM_DD_HH_MM_SS.png";
 
 if (! scalar @ARGV)
 {
-	print STDERR "No directories given...";
+	print STDERR "No directories given...\n";
 	exit 1;
 }
 
