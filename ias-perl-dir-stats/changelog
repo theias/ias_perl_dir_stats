@@ -1,6 +1,6 @@
 ias-perl-dir-stats 1.0.0-0 noarch; urgency=low
 
-	* initial packaging stuff
+	* Initial release
 
- -- YOUR NAME HERE YOUR@EMAIL.HERE  Thu, 07 Dec 2017 14:22:49 -0500
+ -- Martin VanWinkle mvanwinkle@ias.edu  Thu, 07 Dec 2017 14:42:04 -0500
 
