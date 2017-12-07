@@ -1,0 +1,7 @@
+Requires: perl
+AutoReqProv: no 
+Summary: Scripts for analyzing file system / directory usage
+Group: Generic Group
+License: Generic License
+Vendor: Generic Vendor
+BuildArch: noarch
