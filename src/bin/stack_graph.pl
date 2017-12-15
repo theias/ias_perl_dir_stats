@@ -4,16 +4,55 @@
 
 =pod
 
-sudo ./stack_graph.pl \
-	--label var_log \
-	/var/log/{apache2,apt,cups,dist-upgrade,iptraf}
+=head1 NAME
+
+stack_graph.pl - Creates stack graphs for file sizes going back in time
+
+=head1 SYNOPSIS
+
+  stack_graph.pl \
+  	--label-files var_log \
+  	/var/log/{apache2,apt,cups,dist-upgrade,iptraf}
+
+This script needs to have read access on the files it's analyzing.
+
+=head1 DESCRIPTION
+
+It draws stack graphs of the summation of file sizes for the directories
+that were specified over the command line "going back in time".
 
 It answers the question: "If I wanted to keep all files up until X days,
 how much space would be used?"
 
-At any point on the graph, draw a vertical line.  The point where the graph
-intersects with that line is the amount of space that would be required if
-you deleted all files that were older than that date.
+At any point on the graph, if you were to draw a vertical line then
+the point where the graph intersects with that line is the amount of
+space that would be required if you deleted all files that were older
+than that date.
+
+=head1 OPTIONS
+
+=over 4
+
+=item * [ --output-base-dir ] - the base directory for output.  The script creates a
+(sensibly named?) directory under that for the results.
+
+=item * [ --output-dir ] - Where the script should put its files.
+Overrides the (sensible) defaults the script chooses for the output directory.
+
+=item * [ --max-age ] - the maximum age (in seconds) of files to include in the calculations
+
+=item * [ --exclude regex1 [ --exclude regex2 ] ] - a list of regular expressions to
+to exclude when looking for files
+
+=item * [ --label-files ] - a label that gets inserted in to the output file names
+
+=item * [ --follow ] - follow symbolic links. This will cause the preprocess exclude
+to not be enabled, but will allow you to do things like symbolically link
+directories under one directory, and analyze their space usage as a whole.
+
+=back
+
+=head1 BUGS
 
 There is quite an annoying "bug" in File::Find where symbolic links
 can not be followed and preprocess doesn't get executed.
@@ -29,10 +68,6 @@ inside of preprocess won't get executed and directories, such as ".snapshot"
 (if specified as an exclude) will be traversed BUT subsequently ignored as
 the wanted subroutine contains code to exclude them.
 
-The "follow" argument to this script will cause the preprocess exclude
-to not be enabled, but will allow you to do things like symbolically link
-directories under one directory, and analyze their space usage as a whole.
-
 =cut
 
 
@@ -45,6 +80,7 @@ use File::Find;
 use File::Path;
 use IO::File;
 use Getopt::Long;
+use Pod::Usage;
 
 my (
 	$output_base_dir,
@@ -60,17 +96,20 @@ my $DEFAULT_OUTPUT_BASE_DIR = '/tmp/file_size_stack_graph';
 GetOptions(
 	"output-base-dir=s" => \$output_base_dir,
 	"output-dir=s" => \$output_dir,
-	"max-age=s" => \$MAX_AGE,
-	"exclude=s" => \@EXCLUDE,
+	"max-age=i" => \$MAX_AGE,
+	"exclude=s@" => \@EXCLUDE,
 	'label-files=s' => \$label_files,
 	'follow' => \$FOLLOW,
 )
-or die "\nBad Options.\n"
-;
+or pod2usage(
+	-message => "Invalid options specified.\n"
+		. "Please perldoc this file for more information.",
+	-exitval => 1
+);
 
 $FOLLOW = 0 if (! defined $FOLLOW);
 
-$label_files ||= '';
+$label_files ||= 'BLANK_LABEL';
 $label_files = $$ . '-' . $label_files;
 
 my $YYYY_MM_DD_HH_MM_SS = get_yyyy_mm_dd_hh_mm_ss();
@@ -201,8 +240,13 @@ set multiplot
 	
 	$gnuplot_output .= "plot ".join(", \\\n",@plot_dashes) . qq{}.$/;
 
-	my $fh = new IO::File ">$RUN_OUTPUT_DIR/$GNUPLOT_FILE_NAME"
-		or die "Can't open $RUN_OUTPUT_DIR/$GNUPLOT_FILE_NAME for writing: $!";
+	my $gnuplot_output_file_name = join('/',
+		$RUN_OUTPUT_DIR,
+		$GNUPLOT_FILE_NAME,
+	);
+
+	my $fh = new IO::File ">$gnuplot_output_file_name"
+		or die "Can't open $gnuplot_output_file_name for writing: $!";
 
 	print $fh $gnuplot_output;
 
@@ -239,8 +283,13 @@ set multiplot
 		}	
 	}
 	
-	my $data_output_fh = new IO::File ">$RUN_OUTPUT_DIR/$GNUPLOT_DATA_FILE"
-		or die "Can't open $RUN_OUTPUT_DIR/$GNUPLOT_DATA_FILE for writing: $!";
+	my $data_output_file_name = join('/',
+		$RUN_OUTPUT_DIR,
+		$GNUPLOT_DATA_FILE,
+	);
+	
+	my $data_output_fh = new IO::File ">$data_output_file_name"
+		or die "Can't open $data_output_file_name for writing: $!";
 		
 	
 	foreach $date (sort keys %$transformed_data)
@@ -258,61 +307,81 @@ set multiplot
 	$data_output_fh->close();
 }
 
+sub preprocess_directory
+{
+	# print "Preprocess\n";
+	my (@directories) = @_;
+	if (! scalar(@EXCLUDE) )
+	{
+		return @directories;
+	}
+	my %wanted;
+	@wanted{@directories} = (1) x scalar(@directories);
+	my $exclude_me;
+	my $directory;
+	DIRECTORY: foreach $directory (@directories)
+	{
+		foreach $exclude_me (@EXCLUDE)
+		{
+			if ($directory =~ m/$exclude_me/)
+			{
+				delete $wanted{$directory};
+			}
+		}
+	}
+	# use Data::Dumper;
+	# print Dumper(\@wanted);
+	return keys %wanted;
+}
+
+sub wanted_directory
+{
+	# print "In wanted.\n";
+	my $exclude_me;
+	foreach $exclude_me (@EXCLUDE)
+	{
+		# print "Excluding: $exclude_me";
+		return if $File::Find::name =~ m/$exclude_me/;
+	}
+	return if (
+		! -f $File::Find::name
+		&& ! -d $File::Find::name
+	);
+	my (
+		$dev,
+		$ino,
+		$mode,
+		$nlink,
+		$uid,
+		$gid,
+		$rdev,
+		$size,
+		$atime,
+		$mtime,
+		$ctime,
+		$blksize,
+		$blocks,
+	) = stat($File::Find::name);
+
+	return if (
+		$MAX_AGE
+		&& $TIME - $mtime > $MAX_AGE
+	);
+	
+	my $dt = DateTime->from_epoch(epoch => $mtime);
+	$data->{$dt->ymd()}+=$size;
+	$DIRECTORY_SIZES{$directory}+=$size;
+}
+
 sub process_directory
 {
 	my ($directory, $data) = @_;
 
 	find(
 		{
-			preprocess => sub {
-				# print "Preprocess\n";
-				my (@directories) = @_;
-				if (! scalar(@EXCLUDE) )
-				{
-					return @directories;
-				}
-				my %wanted;
-				@wanted{@directories} = (1) x scalar(@directories);
-				my $exclude_me;
-				my $directory;
-				DIRECTORY: foreach $directory (@directories)
-				{
-					foreach $exclude_me (@EXCLUDE)
-					{
-						if ($directory =~ m/$exclude_me/)
-						{
-							delete $wanted{$directory};
-						}
-					}
-				}
-				# use Data::Dumper;
-				# print Dumper(\@wanted);
-				return keys %wanted;
-			},
+			preprocess => \&preprocess_directory,
 						
-			wanted => sub {
-				# print "In wanted.\n";
-				my $exclude_me;
-				foreach $exclude_me (@EXCLUDE)
-				{
-					# print "Excluding: $exclude_me";
-					return if $File::Find::name =~ m/$exclude_me/;
-				}
-				return if (
-					! -f $File::Find::name
-					&& ! -d $File::Find::name
-				);
-				my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks)
-					=stat($File::Find::name);
-				return if (
-					$MAX_AGE
-					&& $TIME - $mtime > $MAX_AGE
-				);
-				
-				my $dt = DateTime->from_epoch(epoch => $mtime);
-				$data->{$dt->ymd()}+=$size;
-				$DIRECTORY_SIZES{$directory}+=$size;
-			},
+			wanted => \&wanted_directory,
 			follow => $FOLLOW,
 			no_chdir => 1,
 		},
