@@ -89,6 +89,7 @@ my (
 	@EXCLUDE,
 	$label_files,
 	$FOLLOW,
+	$DEBUG,
 );
 
 my $DEFAULT_OUTPUT_BASE_DIR = '/tmp/file_size_stack_graph';
@@ -100,6 +101,7 @@ GetOptions(
 	"exclude=s@" => \@EXCLUDE,
 	'label-files=s' => \$label_files,
 	'follow' => \$FOLLOW,
+	'debug' => \$DEBUG,
 )
 or pod2usage(
 	-message => "Invalid options specified.\n"
@@ -158,7 +160,7 @@ if (! scalar @ARGV)
 my $DIRECTORY;
 foreach $DIRECTORY(@ARGV)
 {
-	print "Processing: $DIRECTORY\n";
+	# print "Processing: $DIRECTORY\n";
 	next if ! -d $DIRECTORY;
 	$DIRECTORY_DATA->{$DIRECTORY} = {};
 	
@@ -194,7 +196,7 @@ sub transform_data_to_stack
 {
 	my ($data) = @_;
 
-	print "Data: ", $/ , Dumper(\$data);
+	# print "Data: ", $/ , Dumper(\$data);
 	
 	my $gnuplot_output = q{};
 
@@ -426,3 +428,8 @@ sub get_yyyy_mm_dd_hh_mm_ss
 	return strftime("%Y-%m-%d-%H-%M-%S", localtime);
 	
 }
+
+sub debug
+{
+	print @_ if $DEBUG;
+};
