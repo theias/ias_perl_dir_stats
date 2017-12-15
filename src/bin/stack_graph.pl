@@ -155,14 +155,16 @@ if (! scalar @ARGV)
 	exit 1;
 }
 
-my $directory;
-foreach $directory(@ARGV)
+my $DIRECTORY;
+foreach $DIRECTORY(@ARGV)
 {
-	# print "Processing: $directory\n";
-	next if ! -d $directory;
-	$data->{$directory} = {};
+	print "Processing: $DIRECTORY\n";
+	next if ! -d $DIRECTORY;
+	$data->{$DIRECTORY} = {};
 	
-	process_directory($directory, $data->{$directory});
+	set_base_working_directory($DIRECTORY);
+	
+	process_directory($DIRECTORY, $data->{$DIRECTORY});
 }
 
 transform_data_to_stack($data);
@@ -173,6 +175,20 @@ print "Gnuplot data file: ",$GNUPLOT_DATA_FILE,$/;
 print "Gnuplot output file: ",$GNUPLOT_OUTPUT_FILE,$/;
 
 exit;
+
+{
+	my $base_working_directory;
+	
+	sub set_base_working_directory
+	{
+		($base_working_directory) = @_;
+	}
+	
+	sub get_base_working_directory
+	{
+		return $base_working_directory;
+	} 
+}
 
 sub transform_data_to_stack
 {
@@ -370,7 +386,12 @@ sub wanted_directory
 	
 	my $dt = DateTime->from_epoch(epoch => $mtime);
 	$data->{$dt->ymd()}+=$size;
-	$DIRECTORY_SIZES{$directory}+=$size;
+
+	my $bwd = get_base_working_directory();
+	print "BWD: $bwd\n";
+	print "Name: $File::Find::name\n";
+	
+	$DIRECTORY_SIZES{$bwd}+=$size;
 }
 
 sub process_directory
