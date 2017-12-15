@@ -120,7 +120,7 @@ my %DIRECTORY_SIZES;
 
 my $TIME = time();
 
-my $data = {};
+my $DIRECTORY_DATA = {};
 
 my @output_path_components;
 
@@ -160,14 +160,14 @@ foreach $DIRECTORY(@ARGV)
 {
 	print "Processing: $DIRECTORY\n";
 	next if ! -d $DIRECTORY;
-	$data->{$DIRECTORY} = {};
+	$DIRECTORY_DATA->{$DIRECTORY} = {};
 	
 	set_base_working_directory($DIRECTORY);
 	
-	process_directory($DIRECTORY, $data->{$DIRECTORY});
+	process_directory($DIRECTORY, $DIRECTORY_DATA->{$DIRECTORY});
 }
 
-transform_data_to_stack($data);
+transform_data_to_stack($DIRECTORY_DATA);
 
 print "Run output dir: $RUN_OUTPUT_DIR",$/;
 print "Gnuplot control file: ",$GNUPLOT_FILE_NAME,$/;
@@ -193,6 +193,8 @@ exit;
 sub transform_data_to_stack
 {
 	my ($data) = @_;
+
+	print "Data: ", $/ , Dumper(\$data);
 	
 	my $gnuplot_output = q{};
 
@@ -278,10 +280,13 @@ set multiplot
 	
 	my $date;
 	
+	# print "Directories Order: ",$/,Dumper(\@directories_order),$/;
+	
 	foreach $directory (@directories_order)
 	{
 		foreach $date (keys %{$data->{$directory}})
 		{
+			# print "Date: $date\n"; 
 			$transformed_data->{$date}->{$directory} = $data->{$directory}->{$date};
 		}
 	}
@@ -292,6 +297,7 @@ set multiplot
 	{
 		foreach $directory (@directories_order)
 		{
+			# print "Processing transform for $directory\n";
 			$accumulator->{$directory} += $transformed_data->{$date}->{$directory}
 				if exists $transformed_data->{$date}->{$directory};
 				
@@ -306,7 +312,8 @@ set multiplot
 	
 	my $data_output_fh = new IO::File ">$data_output_file_name"
 		or die "Can't open $data_output_file_name for writing: $!";
-		
+	
+	# print "Transformed data:",$/,Dumper($transformed_data);	
 	
 	foreach $date (sort keys %$transformed_data)
 	{
@@ -317,6 +324,7 @@ set multiplot
 		{
 			push @columns, $new_data->{$date}->{$directory};
 		}
+		# print "Columns: ", join("\t", @columns),$/;
 		print $data_output_fh join("\t", @columns),$/;
 	}
 	
@@ -385,12 +393,13 @@ sub wanted_directory
 	);
 	
 	my $dt = DateTime->from_epoch(epoch => $mtime);
-	$data->{$dt->ymd()}+=$size;
-
 	my $bwd = get_base_working_directory();
-	print "BWD: $bwd\n";
-	print "Name: $File::Find::name\n";
+	$DIRECTORY_DATA->{$bwd}->{$dt->ymd()}+=$size;
+
 	
+#	print "BWD: $bwd\n";
+#	print "Name: $File::Find::name\n";
+#	print "Size: $size\n";
 	$DIRECTORY_SIZES{$bwd}+=$size;
 }
 
