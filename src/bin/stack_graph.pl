@@ -114,14 +114,11 @@ $FOLLOW = 0 if (! defined $FOLLOW);
 $label_files ||= 'BLANK_LABEL';
 $label_files = $$ . '-' . $label_files;
 
+# Globals
 my $YYYY_MM_DD_HH_MM_SS = get_yyyy_mm_dd_hh_mm_ss();
 my $DEFAULT_OUTPUT_SUB_DIR = "$YYYY_MM_DD_HH_MM_SS-$label_files";
-
-# Globals... GERP.
 my %DIRECTORY_SIZES;
-
 my $TIME = time();
-
 my $DIRECTORY_DATA = {};
 
 my @output_path_components;
