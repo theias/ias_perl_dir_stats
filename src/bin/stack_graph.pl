@@ -52,6 +52,17 @@ directories under one directory, and analyze their space usage as a whole.
 
 =back
 
+=head1 EXAMPLES
+
+  ./stack_graph.pl \
+    --output-dir /tmp/test \
+    ~/src/mvanwinkleias_github/* \
+    --exclude '.snapshot' \
+    --use-basename \
+    --label-files home_github \
+    --debug 
+
+
 =head1 BUGS
 
 There is quite an annoying "bug" in File::Find where symbolic links
@@ -78,6 +89,7 @@ use Data::Dumper;
 use DateTime;
 use File::Find;
 use File::Path;
+use File::Basename;
 use IO::File;
 use Getopt::Long;
 use Pod::Usage;
@@ -90,6 +102,7 @@ my (
 	$label_files,
 	$FOLLOW,
 	$DEBUG,
+	$use_basename,
 );
 
 my $DEFAULT_OUTPUT_BASE_DIR = '/tmp/file_size_stack_graph';
@@ -102,6 +115,7 @@ GetOptions(
 	'label-files=s' => \$label_files,
 	'follow' => \$FOLLOW,
 	'debug' => \$DEBUG,
+	'use-basename' => \$use_basename,
 )
 or pod2usage(
 	-message => "Invalid options specified.\n"
@@ -238,6 +252,15 @@ set multiplot
 			
 		}
 		
+		my $name_to_use = $directory;
+		
+		if ($use_basename )
+		{
+			$name_to_use=basename($name_to_use);
+			debug("Will use name: $name_to_use\n");
+		}
+		$name_to_use =~ s/_/\\_/g;
+		
 		$dir_count --;
 		my $using_string = '(('.join('+',@dir_numbers).')/1e6)';
 		
@@ -246,7 +269,7 @@ set multiplot
 			$DIRECTORY_SIZES{$directory}
 		);
 		
-		push @plot_dashes, qq{'$GNUPLOT_DATA_FILE' using 1:$using_string with filledcurves x1 title "$directory $size_display"};
+		push @plot_dashes, qq{'$GNUPLOT_DATA_FILE' using 1:$using_string with filledcurves x1 title '$name_to_use $size_display'};
 	}
 	
 	my $transformed_data = {};
@@ -395,7 +418,7 @@ sub wanted_directory
 	my $bwd = get_base_working_directory();
 	$DIRECTORY_DATA->{$bwd}->{$dt->ymd()}+=$size;
 
-	
+	debug("In: ", $File::Find::name, $/);
 #	print "BWD: $bwd\n";
 #	print "Name: $File::Find::name\n";
 #	print "Size: $size\n";
